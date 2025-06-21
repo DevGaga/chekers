@@ -133,11 +133,18 @@ def has_any_moves(board, player):
 def count_pieces(board):
     flat = sum(board, [])
     return {
-        'B': sum(p.startswith('B') for p in flat),
-        'R': sum(p.startswith('R') for p in flat),
+        'B': sum(p.startswith('B') and not is_king(p) for p in flat),
         'BK': sum(p == 'BK' for p in flat),
+        'R': sum(p.startswith('R') and not is_king(p) for p in flat),
         'RK': sum(p == 'RK' for p in flat)
     }
+
+def calculate_score(piece_counts):
+    return {
+        'B': piece_counts['B'] * 1 + piece_counts['BK'] * 3,
+        'R': piece_counts['R'] * 1 + piece_counts['RK'] * 3
+    }
+
 
 def detect_draw(piece_counts):
     kings = piece_counts['BK'] + piece_counts['RK']
