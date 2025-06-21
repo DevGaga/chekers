@@ -18,9 +18,9 @@ BLUE = (70, 130, 180)
 
 # Load sounds and images
 pygame.init()
-move_sound = pygame.mixer.Sound("assets\move.wav")
-king_image_red = pygame.image.load("assets\red_king.png")
-king_image_black = pygame.image.load("black_king.png")
+move_sound = pygame.mixer.Sound("assets/move.wav")
+king_image_red = pygame.image.load("assets/red_king.png")
+king_image_black = pygame.image.load("assets/black_king.png")
 king_image_red = pygame.transform.scale(king_image_red, (SQUARE_SIZE - 10, SQUARE_SIZE - 10))
 king_image_black = pygame.transform.scale(king_image_black, (SQUARE_SIZE - 10, SQUARE_SIZE - 10))
 
