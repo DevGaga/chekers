@@ -1,3 +1,5 @@
+# engine.py
+
 def create_board():
     board = []
     for row in range(8):
@@ -45,7 +47,6 @@ def is_valid_move(board, sr, sc, er, ec, player, is_capture=False):
     abs_dr = abs(dr)
     abs_dc = abs(dc)
 
-    # Normal move (only one step for non-kings)
     if abs_dr == 1 and abs_dc == 1 and not is_capture:
         if is_king(piece):
             return True
@@ -53,7 +54,6 @@ def is_valid_move(board, sr, sc, er, ec, player, is_capture=False):
             return True
         return False
 
-    # Capture move
     if abs_dr == 2 and abs_dc == 2:
         mid_row = (sr + er) // 2
         mid_col = (sc + ec) // 2
@@ -62,7 +62,6 @@ def is_valid_move(board, sr, sc, er, ec, player, is_capture=False):
             return True
         return False
 
-    # King long-range capture
     if is_king(piece) and abs_dr == abs_dc:
         step_r = 1 if dr > 0 else -1
         step_c = 1 if dc > 0 else -1
@@ -75,7 +74,7 @@ def is_valid_move(board, sr, sc, er, ec, player, is_capture=False):
                     enemies += 1
                     enemy_pos = (r, c)
                 else:
-                    return False  # blocked by own piece
+                    return False
         if enemies == 1:
             return True
     return False
@@ -145,7 +144,6 @@ def calculate_score(piece_counts):
         'R': piece_counts['R'] * 1 + piece_counts['RK'] * 3
     }
 
-
 def detect_draw(piece_counts):
     kings = piece_counts['BK'] + piece_counts['RK']
     total = piece_counts['B'] + piece_counts['R']
@@ -161,61 +159,60 @@ def replay_game(move_log):
         print_board(board)
         input("Press Enter for next move...")
 
-# === Game Start ===
-board = create_board()
-current_player = 'B'
-move_log = []
+# Only run the console game when engine.py is executed directly
+if __name__ == "__main__":
+    board = create_board()
+    current_player = 'B'
+    move_log = []
 
-while True:
-    print_board(board)
-    print(f"\n{current_player}'s turn")
-    piece_counts = count_pieces(board)
+    while True:
+        print_board(board)
+        print(f"\n{current_player}'s turn")
+        piece_counts = count_pieces(board)
 
-    if not has_any_moves(board, current_player):
-        print(f"🛑 {current_player} has no valid moves. Game over!")
-        winner = 'R' if current_player == 'B' else 'B'
-        print(f"🎉 {winner} wins!")
-        break
+        if not has_any_moves(board, current_player):
+            print(f"🛑 {current_player} has no valid moves. Game over!")
+            winner = 'R' if current_player == 'B' else 'B'
+            print(f"🎉 {winner} wins!")
+            break
 
-    if detect_draw(piece_counts):
-        print("🤝 It's a draw! Only kings or 1 piece left each.")
-        break
+        if detect_draw(piece_counts):
+            print("🤝 It's a draw! Only kings or 1 piece left each.")
+            break
 
-    try:
-        move = input("Enter move (start_row start_col end_row end_col): ")
-        sr, sc, er, ec = map(int, move.strip().split())
+        try:
+            move = input("Enter move (start_row start_col end_row end_col): ")
+            sr, sc, er, ec = map(int, move.strip().split())
 
-        if not is_valid_move(board, sr, sc, er, ec, current_player):
-            print("❌ Invalid move.")
-            continue
+            if not is_valid_move(board, sr, sc, er, ec, current_player):
+                print("❌ Invalid move.")
+                continue
 
-        sr, sc = make_move(board, sr, sc, er, ec, current_player, move_log)
+            sr, sc = make_move(board, sr, sc, er, ec, current_player, move_log)
 
-        # Check for more captures
-        while True:
-            captures = get_available_captures(board, sr, sc, current_player)
-            if not captures:
-                break
-            print_board(board)
-            print(f"{current_player}, you have another capture from ({sr}, {sc})!")
-            print("Available jumps:", captures)
-            next_jump = input("Next jump (end_row end_col): ")
-            try:
-                new_er, new_ec = map(int, next_jump.strip().split())
-                if (new_er, new_ec) not in captures:
-                    print("Invalid capture. Ending turn.")
+            while True:
+                captures = get_available_captures(board, sr, sc, current_player)
+                if not captures:
                     break
-                sr, sc = make_move(board, sr, sc, new_er, new_ec, current_player, move_log)
-            except:
-                print("Invalid input. Ending chain.")
-                break
+                print_board(board)
+                print(f"{current_player}, you have another capture from ({sr}, {sc})!")
+                print("Available jumps:", captures)
+                next_jump = input("Next jump (end_row end_col): ")
+                try:
+                    new_er, new_ec = map(int, next_jump.strip().split())
+                    if (new_er, new_ec) not in captures:
+                        print("Invalid capture. Ending turn.")
+                        break
+                    sr, sc = make_move(board, sr, sc, new_er, new_ec, current_player, move_log)
+                except:
+                    print("Invalid input. Ending chain.")
+                    break
 
-        current_player = 'R' if current_player == 'B' else 'B'
-    except Exception as e:
-        print("⚠️ Error:", e)
-        print("Use format: start_row start_col end_row end_col")
+            current_player = 'R' if current_player == 'B' else 'B'
+        except Exception as e:
+            print("⚠️ Error:", e)
+            print("Use format: start_row start_col end_row end_col")
 
-# Replay mode
-ans = input("🔁 Replay game? (y/n): ").lower()
-if ans == 'y':
-    replay_game(move_log)
+    ans = input("🔁 Replay game? (y/n): ").lower()
+    if ans == 'y':
+        replay_game(move_log)
