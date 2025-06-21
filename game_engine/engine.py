@@ -1,95 +1,190 @@
-# Initialize the board
 def create_board():
     board = []
     for row in range(8):
         board_row = []
-        for column in range(8):
-            if (row + column) % 2 == 1:  # Dark squares
+        for col in range(8):
+            if (row + col) % 2 == 1:
                 if row < 3:
-                    board_row.append('B')  # Black pieces
+                    board_row.append('B')
                 elif row > 4:
-                    board_row.append('R')  # Red pieces
+                    board_row.append('R')
                 else:
-                    board_row.append(' ')  # Empty square
+                    board_row.append(' ')
             else:
-                board_row.append(' ')  # Light squares
+                board_row.append(' ')
         board.append(board_row)
     return board
 
-# Print the board for visualization
 def print_board(board):
-    print("  " + " ".join(map(str, range(8))))  # Column numbers
+    print("  " + " ".join(map(str, range(8))))
     for idx, row in enumerate(board):
-        print(str(idx) + ' ' + ' '.join(row))  # Row numbers
+        print(str(idx) + ' ' + ' '.join(p if len(p) == 2 else ' ' + p for p in row))
 
-# Check if move is valid
-def is_valid_move(board, start_row, start_col, end_row, end_col, player, is_capture=False):
-    if not all(0 <= n < 8 for n in [start_row, start_col, end_row, end_col]):
+def is_king(piece):
+    return piece in ['BK', 'RK']
+
+def promote_to_king(board, row, col, player):
+    if player == 'B' and row == 7:
+        board[row][col] = 'BK'
+    elif player == 'R' and row == 0:
+        board[row][col] = 'RK'
+
+def is_valid_move(board, sr, sc, er, ec, player, is_capture=False):
+    if not all(0 <= n < 8 for n in [sr, sc, er, ec]):
         return False
 
-    if board[start_row][start_col] != player:
+    piece = board[sr][sc]
+    if piece not in [player, player + 'K']:
         return False
 
-    if board[end_row][end_col] != ' ':
+    if board[er][ec] != ' ':
         return False
 
-    d_row = end_row - start_row
-    d_col = end_col - start_col
+    dr = er - sr
+    dc = ec - sc
+    abs_dr = abs(dr)
+    abs_dc = abs(dc)
 
-    # Normal move (only forward allowed)
-    if abs(d_row) == 1 and abs(d_col) == 1 and not is_capture:
-        if (player == 'B' and d_row == 1) or (player == 'R' and d_row == -1):
+    # Normal move (only one step for non-kings)
+    if abs_dr == 1 and abs_dc == 1 and not is_capture:
+        if is_king(piece):
+            return True
+        elif (player == 'B' and dr == 1) or (player == 'R' and dr == -1):
             return True
         return False
 
-    # Capture move (allow all directions)
-    if abs(d_row) == 2 and abs(d_col) == 2:
-        mid_row = (start_row + end_row) // 2
-        mid_col = (start_col + end_col) // 2
-        middle_piece = board[mid_row][mid_col]
-        if middle_piece != ' ' and middle_piece != player:
+    # Capture move
+    if abs_dr == 2 and abs_dc == 2:
+        mid_row = (sr + er) // 2
+        mid_col = (sc + ec) // 2
+        middle = board[mid_row][mid_col]
+        if middle != ' ' and middle[0] != player:
             return True
+        return False
 
+    # King long-range capture
+    if is_king(piece) and abs_dr == abs_dc:
+        step_r = 1 if dr > 0 else -1
+        step_c = 1 if dc > 0 else -1
+        enemies = 0
+        for i in range(1, abs_dr):
+            r = sr + i * step_r
+            c = sc + i * step_c
+            if board[r][c] != ' ':
+                if board[r][c][0] != player:
+                    enemies += 1
+                    enemy_pos = (r, c)
+                else:
+                    return False  # blocked by own piece
+        if enemies == 1:
+            return True
     return False
 
-# Make a move (and handle capture)
-def make_move(board, start_row, start_col, end_row, end_col, player):
-    if abs(end_row - start_row) == 2:
-        mid_row = (start_row + end_row) // 2
-        mid_col = (start_col + end_col) // 2
-        board[mid_row][mid_col] = ' '
-    board[end_row][end_col] = player
-    board[start_row][start_col] = ' '
-    return end_row, end_col
+def make_move(board, sr, sc, er, ec, player, move_log):
+    piece = board[sr][sc]
+    move_log.append((sr, sc, er, ec, piece))
 
-# Get all possible captures from a position
-def get_available_captures(board, row, col, player):
-    directions = [(-2, -2), (-2, 2), (2, -2), (2, 2)]
+    if abs(er - sr) > 1:
+        step_r = 1 if er > sr else -1
+        step_c = 1 if ec > sc else -1
+        r, c = sr + step_r, sc + step_c
+        while r != er and c != ec:
+            if board[r][c] != ' ' and board[r][c][0] != player:
+                board[r][c] = ' '
+                break
+            r += step_r
+            c += step_c
+
+    board[er][ec] = piece
+    board[sr][sc] = ' '
+    promote_to_king(board, er, ec, player)
+    return er, ec
+
+def get_available_captures(board, r, c, player):
+    piece = board[r][c]
     captures = []
-    for dr, dc in directions:
-        new_r, new_c = row + dr, col + dc
-        if is_valid_move(board, row, col, new_r, new_c, player, is_capture=True):
-            captures.append((new_r, new_c))
+    directions = [(-2, -2), (-2, 2), (2, -2), (2, 2)]
+    if is_king(piece):
+        for d in range(1, 8):
+            for dr, dc in [(-d, -d), (-d, d), (d, -d), (d, d)]:
+                er, ec = r + dr, c + dc
+                if is_valid_move(board, r, c, er, ec, player, is_capture=True):
+                    captures.append((er, ec))
+    else:
+        for dr, dc in directions:
+            er, ec = r + dr, c + dc
+            if is_valid_move(board, r, c, er, ec, player, is_capture=True):
+                captures.append((er, ec))
     return captures
 
-# --- GAME STARTS HERE ---
+def has_any_moves(board, player):
+    for r in range(8):
+        for c in range(8):
+            if board[r][c] in [player, player + 'K']:
+                for dr in [-1, 1]:
+                    for dc in [-1, 1]:
+                        nr, nc = r + dr, c + dc
+                        if is_valid_move(board, r, c, nr, nc, player):
+                            return True
+                if get_available_captures(board, r, c, player):
+                    return True
+    return False
+
+def count_pieces(board):
+    flat = sum(board, [])
+    return {
+        'B': sum(p.startswith('B') for p in flat),
+        'R': sum(p.startswith('R') for p in flat),
+        'BK': sum(p == 'BK' for p in flat),
+        'RK': sum(p == 'RK' for p in flat)
+    }
+
+def detect_draw(piece_counts):
+    kings = piece_counts['BK'] + piece_counts['RK']
+    total = piece_counts['B'] + piece_counts['R']
+    return kings >= 2 and total <= 2
+
+def replay_game(move_log):
+    board = create_board()
+    print("\n📽️ Replaying game:")
+    for move in move_log:
+        sr, sc, er, ec, piece = move
+        board[er][ec] = piece
+        board[sr][sc] = ' '
+        print_board(board)
+        input("Press Enter for next move...")
+
+# === Game Start ===
 board = create_board()
 current_player = 'B'
+move_log = []
 
 while True:
     print_board(board)
     print(f"\n{current_player}'s turn")
+    piece_counts = count_pieces(board)
+
+    if not has_any_moves(board, current_player):
+        print(f"🛑 {current_player} has no valid moves. Game over!")
+        winner = 'R' if current_player == 'B' else 'B'
+        print(f"🎉 {winner} wins!")
+        break
+
+    if detect_draw(piece_counts):
+        print("🤝 It's a draw! Only kings or 1 piece left each.")
+        break
+
     try:
         move = input("Enter move (start_row start_col end_row end_col): ")
         sr, sc, er, ec = map(int, move.strip().split())
 
         if not is_valid_move(board, sr, sc, er, ec, current_player):
-            print("Invalid move.")
+            print("❌ Invalid move.")
             continue
 
-        sr, sc = make_move(board, sr, sc, er, ec, current_player)
+        sr, sc = make_move(board, sr, sc, er, ec, current_player, move_log)
 
-        # Multi-capture loop
+        # Check for more captures
         while True:
             captures = get_available_captures(board, sr, sc, current_player)
             if not captures:
@@ -97,20 +192,23 @@ while True:
             print_board(board)
             print(f"{current_player}, you have another capture from ({sr}, {sc})!")
             print("Available jumps:", captures)
-            next_input = input("Enter next jump (end_row end_col): ")
+            next_jump = input("Next jump (end_row end_col): ")
             try:
-                new_er, new_ec = map(int, next_input.strip().split())
+                new_er, new_ec = map(int, next_jump.strip().split())
                 if (new_er, new_ec) not in captures:
-                    print("Invalid jump. Turn ends.")
+                    print("Invalid capture. Ending turn.")
                     break
-                sr, sc = make_move(board, sr, sc, new_er, new_ec, current_player)
+                sr, sc = make_move(board, sr, sc, new_er, new_ec, current_player, move_log)
             except:
-                print("Invalid input. Turn ends.")
+                print("Invalid input. Ending chain.")
                 break
 
-        # Switch turn
         current_player = 'R' if current_player == 'B' else 'B'
-
     except Exception as e:
-        print("Error:", e)
-        print("Invalid input format. Use: start_row start_col end_row end_col")
+        print("⚠️ Error:", e)
+        print("Use format: start_row start_col end_row end_col")
+
+# Replay mode
+ans = input("🔁 Replay game? (y/n): ").lower()
+if ans == 'y':
+    replay_game(move_log)
