@@ -63,20 +63,24 @@ def is_valid_move(board, sr, sc, er, ec, player, is_capture=False):
         return False
 
     if is_king(piece) and abs_dr == abs_dc:
+        enemies = 0
         step_r = 1 if dr > 0 else -1
         step_c = 1 if dc > 0 else -1
-        enemies = 0
-        for i in range(1, abs_dr):
-            r = sr + i * step_r
-            c = sc + i * step_c
+        r, c = sr + step_r, sc + step_c
+        enemy_pos = None
+        while r != er and c != ec:
             if board[r][c] != ' ':
                 if board[r][c][0] != player:
                     enemies += 1
+                    if enemies > 1:
+                        return False
                     enemy_pos = (r, c)
                 else:
                     return False
-        if enemies == 1:
-            return True
+            r += step_r
+            c += step_c
+        return enemies == 1
+
     return False
 
 def make_move(board, sr, sc, er, ec, player, move_log):
@@ -102,17 +106,16 @@ def make_move(board, sr, sc, er, ec, player, move_log):
 def get_available_captures(board, r, c, player):
     piece = board[r][c]
     captures = []
-    directions = [(-2, -2), (-2, 2), (2, -2), (2, 2)]
     if is_king(piece):
         for d in range(1, 8):
             for dr, dc in [(-d, -d), (-d, d), (d, -d), (d, d)]:
                 er, ec = r + dr, c + dc
-                if is_valid_move(board, r, c, er, ec, player, is_capture=True):
+                if 0 <= er < 8 and 0 <= ec < 8 and is_valid_move(board, r, c, er, ec, player, is_capture=True):
                     captures.append((er, ec))
     else:
-        for dr, dc in directions:
+        for dr, dc in [(-2, -2), (-2, 2), (2, -2), (2, 2)]:
             er, ec = r + dr, c + dc
-            if is_valid_move(board, r, c, er, ec, player, is_capture=True):
+            if 0 <= er < 8 and 0 <= ec < 8 and is_valid_move(board, r, c, er, ec, player, is_capture=True):
                 captures.append((er, ec))
     return captures
 
@@ -123,7 +126,7 @@ def has_any_moves(board, player):
                 for dr in [-1, 1]:
                     for dc in [-1, 1]:
                         nr, nc = r + dr, c + dc
-                        if is_valid_move(board, r, c, nr, nc, player):
+                        if 0 <= nr < 8 and 0 <= nc < 8 and is_valid_move(board, r, c, nr, nc, player):
                             return True
                 if get_available_captures(board, r, c, player):
                     return True
@@ -159,7 +162,6 @@ def replay_game(move_log):
         print_board(board)
         input("Press Enter for next move...")
 
-# Only run the console game when engine.py is executed directly
 if __name__ == "__main__":
     board = create_board()
     current_player = 'B'
@@ -190,6 +192,7 @@ if __name__ == "__main__":
 
             sr, sc = make_move(board, sr, sc, er, ec, current_player, move_log)
 
+            # Multi-capture loop
             while True:
                 captures = get_available_captures(board, sr, sc, current_player)
                 if not captures:
