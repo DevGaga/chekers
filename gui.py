@@ -1,3 +1,4 @@
+
 # gui.py
 
 import pygame
@@ -10,10 +11,15 @@ from engine import (
 
 # Constants
 ROWS, COLS = 8, 8
-MARGIN = 40  # Margin around the board
 BUTTON_HEIGHT = 40
-BUTTON_MARGIN = 20
+BUTTON_MARGIN = 10
 BUTTON_AREA = BUTTON_HEIGHT + BUTTON_MARGIN * 2
+
+# Margins and layout
+LEFT_MARGIN = 120  # reserved for logo on left
+RIGHT_MARGIN = 10  # reduced right margin to balance layout
+TOP_MARGIN = 10
+BOTTOM_MARGIN = 10 + BUTTON_AREA  # buttons area below board
 
 # Colors
 LIGHT_BROWN = (245, 222, 179)
@@ -24,28 +30,40 @@ BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 BLUE = (70, 130, 180)
 
-# Load sounds and images
+# Initialize pygame and load resources
 pygame.init()
+
+# Load sounds and images
 move_sound = pygame.mixer.Sound("assets/move.wav")
 king_image_red = pygame.image.load("assets/red_king.png")
 king_image_black = pygame.image.load("assets/black_king.png")
 
-# Responsive layout
-info = pygame.display.Info()
-SCREEN_WIDTH = min(info.current_w - 100, 720)
-max_board_height = info.current_h - 180
-SQUARE_SIZE = min((SCREEN_WIDTH - MARGIN * 2) // COLS, (max_board_height - MARGIN * 2 - BUTTON_AREA) // ROWS)
-BOARD_SIZE = SQUARE_SIZE * ROWS
-SCREEN_HEIGHT = BOARD_SIZE + BUTTON_AREA + MARGIN * 2
+# Load and scale logo image for left margin
+logo = pygame.image.load("assets/ireens_logo.png")
 
-# Resize images
+# Responsive layout based on screen size
+info = pygame.display.Info()
+SCREEN_WIDTH = min(info.current_w - 50, 800)
+max_board_height = info.current_h - 120
+
+available_width = SCREEN_WIDTH - LEFT_MARGIN - RIGHT_MARGIN
+SQUARE_SIZE = min(
+    available_width // COLS,
+    (max_board_height - TOP_MARGIN - BOTTOM_MARGIN) // ROWS
+)
+BOARD_SIZE = SQUARE_SIZE * ROWS
+SCREEN_HEIGHT = BOARD_SIZE + TOP_MARGIN + BOTTOM_MARGIN
+
+# Resize images according to square size
 king_image_red = pygame.transform.scale(king_image_red, (SQUARE_SIZE - 10, SQUARE_SIZE - 10))
 king_image_black = pygame.transform.scale(king_image_black, (SQUARE_SIZE - 10, SQUARE_SIZE - 10))
+logo = pygame.transform.scale(logo, (LEFT_MARGIN - 20, LEFT_MARGIN - 20))
 
+# Set up window
 WIN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.RESIZABLE)
 pygame.display.set_caption("Checkers GUI")
 
-# Button dimensions responsive to width
+# Buttons setup - width based on screen width
 button_width = SCREEN_WIDTH // 4
 undo_button = pygame.Rect(SCREEN_WIDTH // 8, SCREEN_HEIGHT - BUTTON_AREA + BUTTON_MARGIN, button_width, BUTTON_HEIGHT)
 redo_button = pygame.Rect(SCREEN_WIDTH * 5 // 8, SCREEN_HEIGHT - BUTTON_AREA + BUTTON_MARGIN, button_width, BUTTON_HEIGHT)
@@ -53,10 +71,14 @@ redo_button = pygame.Rect(SCREEN_WIDTH * 5 // 8, SCREEN_HEIGHT - BUTTON_AREA + B
 # Drawing functions
 def draw_board(win, board, valid_moves):
     win.fill(WHITE)
+
+    # Draw logo on left side with padding
+    win.blit(logo, (10, TOP_MARGIN))
+
     for row in range(ROWS):
         for col in range(COLS):
-            x = MARGIN + col * SQUARE_SIZE
-            y = MARGIN + row * SQUARE_SIZE
+            x = LEFT_MARGIN + col * SQUARE_SIZE
+            y = TOP_MARGIN + row * SQUARE_SIZE
             color = DARK_BROWN if (row + col) % 2 else LIGHT_BROWN
             pygame.draw.rect(win, color, (x, y, SQUARE_SIZE, SQUARE_SIZE))
             if (row, col) in valid_moves:
@@ -66,7 +88,7 @@ def draw_board(win, board, valid_moves):
         for col in range(COLS):
             piece = board[row][col]
             if piece != ' ':
-                center = (MARGIN + col * SQUARE_SIZE + SQUARE_SIZE // 2, MARGIN + row * SQUARE_SIZE + SQUARE_SIZE // 2)
+                center = (LEFT_MARGIN + col * SQUARE_SIZE + SQUARE_SIZE // 2, TOP_MARGIN + row * SQUARE_SIZE + SQUARE_SIZE // 2)
                 if piece == 'B':
                     pygame.draw.circle(win, BLACK, center, SQUARE_SIZE // 2 - 10)
                 elif piece == 'R':
@@ -90,8 +112,8 @@ def draw_buttons(win):
 
 def get_row_col_from_mouse(pos):
     x, y = pos
-    x -= MARGIN
-    y -= MARGIN
+    x -= LEFT_MARGIN
+    y -= TOP_MARGIN
     return y // SQUARE_SIZE, x // SQUARE_SIZE
 
 def main():
@@ -116,7 +138,7 @@ def main():
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_pos = pygame.mouse.get_pos()
 
-                if undo_button.collidepoint(mouse_pos) and move_log:
+                if undo_button.collidepoint(mouse_pos) and undo_stack:
                     redo_stack.append((copy.deepcopy(board), current_player))
                     board = undo_stack.pop()
                     current_player = 'R' if current_player == 'B' else 'B'
