@@ -106,17 +106,29 @@ def make_move(board, sr, sc, er, ec, player, move_log):
 def get_available_captures(board, r, c, player):
     piece = board[r][c]
     captures = []
+
     if is_king(piece):
-        for d in range(1, 8):
-            for dr, dc in [(-d, -d), (-d, d), (d, -d), (d, d)]:
-                er, ec = r + dr, c + dc
-                if 0 <= er < 8 and 0 <= ec < 8 and is_valid_move(board, r, c, er, ec, player, is_capture=True):
-                    captures.append((er, ec))
+        for dr_sign in [-1, 1]:
+            for dc_sign in [-1, 1]:
+                for dist in range(2, 8):
+                    er = r + dr_sign * dist
+                    ec = c + dc_sign * dist
+                    if 0 <= er < 8 and 0 <= ec < 8:
+                        if is_valid_move(board, r, c, er, ec, player, is_capture=True):
+                            captures.append((er, ec))
+                        elif board[er][ec] != ' ':
+                            break
+                    else:
+                        break
     else:
-        for dr, dc in [(-2, -2), (-2, 2), (2, -2), (2, 2)]:
-            er, ec = r + dr, c + dc
-            if 0 <= er < 8 and 0 <= ec < 8 and is_valid_move(board, r, c, er, ec, player, is_capture=True):
-                captures.append((er, ec))
+        directions = [(-2, -2), (-2, 2), (2, -2), (2, 2)]
+        for dr, dc in directions:
+            er = r + dr
+            ec = c + dc
+            if 0 <= er < 8 and 0 <= ec < 8:
+                if is_valid_move(board, r, c, er, ec, player, is_capture=True):
+                    captures.append((er, ec))
+
     return captures
 
 def has_any_moves(board, player):
@@ -162,60 +174,16 @@ def replay_game(move_log):
         print_board(board)
         input("Press Enter for next move...")
 
-if __name__ == "__main__":
-    board = create_board()
-    current_player = 'B'
-    move_log = []
-
-    while True:
+def handle_multi_capture(board, sr, sc, player, move_log):
+    captures = get_available_captures(board, sr, sc, player)
+    while captures:
         print_board(board)
-        print(f"\n{current_player}'s turn")
-        piece_counts = count_pieces(board)
-
-        if not has_any_moves(board, current_player):
-            print(f"🛑 {current_player} has no valid moves. Game over!")
-            winner = 'R' if current_player == 'B' else 'B'
-            print(f"🎉 {winner} wins!")
-            break
-
-        if detect_draw(piece_counts):
-            print("🤝 It's a draw! Only kings or 1 piece left each.")
-            break
-
+        print(f"{player}, you have another capture from ({sr}, {sc})!")
+        print("Available jumps:", captures)
         try:
-            move = input("Enter move (start_row start_col end_row end_col): ")
-            sr, sc, er, ec = map(int, move.strip().split())
-
-            if not is_valid_move(board, sr, sc, er, ec, current_player):
-                print("❌ Invalid move.")
-                continue
-
-            sr, sc = make_move(board, sr, sc, er, ec, current_player, move_log)
-
-            # Multi-capture loop
-            while True:
-                captures = get_available_captures(board, sr, sc, current_player)
-                if not captures:
-                    break
-                print_board(board)
-                print(f"{current_player}, you have another capture from ({sr}, {sc})!")
-                print("Available jumps:", captures)
-                next_jump = input("Next jump (end_row end_col): ")
-                try:
-                    new_er, new_ec = map(int, next_jump.strip().split())
-                    if (new_er, new_ec) not in captures:
-                        print("Invalid capture. Ending turn.")
-                        break
-                    sr, sc = make_move(board, sr, sc, new_er, new_ec, current_player, move_log)
-                except:
-                    print("Invalid input. Ending chain.")
-                    break
-
-            current_player = 'R' if current_player == 'B' else 'B'
-        except Exception as e:
-            print("⚠️ Error:", e)
-            print("Use format: start_row start_col end_row end_col")
-
-    ans = input("🔁 Replay game? (y/n): ").lower()
-    if ans == 'y':
-        replay_game(move_log)
+            er, ec = captures[0]  # auto-select first capture in GUI version
+            sr, sc = make_move(board, sr, sc, er, ec, player, move_log)
+            captures = get_available_captures(board, sr, sc, player)
+        except Exception:
+            break
+    return sr, sc
