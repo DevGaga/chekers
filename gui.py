@@ -1,4 +1,3 @@
-
 # gui.py
 
 import pygame
@@ -6,7 +5,8 @@ import copy
 from engine import (
     create_board, is_valid_move, make_move,
     get_available_captures, count_pieces,
-    calculate_score, promote_to_king, handle_multi_capture
+    calculate_score, promote_to_king, handle_multi_capture,
+    player_has_captures
 )
 
 # Constants
@@ -16,10 +16,10 @@ BUTTON_MARGIN = 10
 BUTTON_AREA = BUTTON_HEIGHT + BUTTON_MARGIN * 2
 
 # Margins and layout
-LEFT_MARGIN = 120  # reserved for logo on left
-RIGHT_MARGIN = 10  # reduced right margin to balance layout
+LEFT_MARGIN = 120
+RIGHT_MARGIN = 10
 TOP_MARGIN = 10
-BOTTOM_MARGIN = 10 + BUTTON_AREA  # buttons area below board
+BOTTOM_MARGIN = 10 + BUTTON_AREA
 
 # Colors
 LIGHT_BROWN = (245, 222, 179)
@@ -33,15 +33,11 @@ BLUE = (70, 130, 180)
 # Initialize pygame and load resources
 pygame.init()
 
-# Load sounds and images
 move_sound = pygame.mixer.Sound("assets/move.wav")
 king_image_red = pygame.image.load("assets/red_king.png")
 king_image_black = pygame.image.load("assets/black_king.png")
-
-# Load and scale logo image for left margin
 logo = pygame.image.load("assets/ireens_logo.png")
 
-# Responsive layout based on screen size
 info = pygame.display.Info()
 SCREEN_WIDTH = min(info.current_w - 50, 800)
 max_board_height = info.current_h - 120
@@ -54,25 +50,19 @@ SQUARE_SIZE = min(
 BOARD_SIZE = SQUARE_SIZE * ROWS
 SCREEN_HEIGHT = BOARD_SIZE + TOP_MARGIN + BOTTOM_MARGIN
 
-# Resize images according to square size
 king_image_red = pygame.transform.scale(king_image_red, (SQUARE_SIZE - 10, SQUARE_SIZE - 10))
 king_image_black = pygame.transform.scale(king_image_black, (SQUARE_SIZE - 10, SQUARE_SIZE - 10))
 logo = pygame.transform.scale(logo, (LEFT_MARGIN - 20, LEFT_MARGIN - 20))
 
-# Set up window
 WIN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.RESIZABLE)
 pygame.display.set_caption("Checkers GUI")
 
-# Buttons setup - width based on screen width
 button_width = SCREEN_WIDTH // 4
 undo_button = pygame.Rect(SCREEN_WIDTH // 8, SCREEN_HEIGHT - BUTTON_AREA + BUTTON_MARGIN, button_width, BUTTON_HEIGHT)
 redo_button = pygame.Rect(SCREEN_WIDTH * 5 // 8, SCREEN_HEIGHT - BUTTON_AREA + BUTTON_MARGIN, button_width, BUTTON_HEIGHT)
 
-# Drawing functions
 def draw_board(win, board, valid_moves):
     win.fill(WHITE)
-
-    # Draw logo on left side with padding
     win.blit(logo, (10, TOP_MARGIN))
 
     for row in range(ROWS):
@@ -110,11 +100,26 @@ def draw_buttons(win):
     win.blit(undo_text, (undo_button.centerx - undo_text.get_width() // 2, undo_button.centery - undo_text.get_height() // 2))
     win.blit(redo_text, (redo_button.centerx - redo_text.get_width() // 2, redo_button.centery - redo_text.get_height() // 2))
 
+def draw_alert(win, message):
+    if message:
+        font = pygame.font.SysFont(None, 32)
+        text = font.render(message, True, RED)
+        win.blit(text, (LEFT_MARGIN + 10, SCREEN_HEIGHT - BUTTON_AREA - 30))
+
 def get_row_col_from_mouse(pos):
     x, y = pos
     x -= LEFT_MARGIN
     y -= TOP_MARGIN
     return y // SQUARE_SIZE, x // SQUARE_SIZE
+
+def get_all_capture_positions(board, player):
+    positions = []
+    for r in range(ROWS):
+        for c in range(COLS):
+            if board[r][c].startswith(player):
+                if get_available_captures(board, r, c, player):
+                    positions.append((r, c))
+    return positions
 
 def main():
     board = create_board()
@@ -126,10 +131,13 @@ def main():
     move_log = []
     undo_stack = []
     redo_stack = []
+    alert_message = ""
 
     while run:
         clock.tick(60)
-        draw_board(WIN, board, valid_moves)
+        draw_board(WIN, board, get_all_capture_positions(board, current_player) if alert_message else valid_moves)
+        draw_alert(WIN, alert_message)
+        pygame.display.update()
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -144,12 +152,14 @@ def main():
                     current_player = 'R' if current_player == 'B' else 'B'
                     selected = None
                     valid_moves = []
+                    alert_message = ""
                     continue
                 elif redo_button.collidepoint(mouse_pos) and redo_stack:
                     undo_stack.append(copy.deepcopy(board))
                     board, current_player = redo_stack.pop()
                     selected = None
                     valid_moves = []
+                    alert_message = ""
                     continue
 
                 row, col = get_row_col_from_mouse(mouse_pos)
@@ -157,22 +167,46 @@ def main():
                     continue
 
                 if selected:
-                    if is_valid_move(board, *selected, row, col, current_player):
-                        undo_stack.append(copy.deepcopy(board))
-                        redo_stack.clear()
-                        new_r, new_c = make_move(board, *selected, row, col, current_player, move_log)
-                        promote_to_king(board, new_r, new_c, current_player)
-                        move_sound.play()
-
-                        before_switch = (new_r, new_c)
-                        after_r, after_c = handle_multi_capture(board, new_r, new_c, current_player, move_log)
-                        if (after_r, after_c) == before_switch:
-                            current_player = 'R' if current_player == 'B' else 'B'
-                    selected = None
-                    valid_moves = []
+                    if player_has_captures(board, current_player):
+                        if is_valid_move(board, *selected, row, col, current_player, is_capture=True):
+                            undo_stack.append(copy.deepcopy(board))
+                            redo_stack.clear()
+                            new_r, new_c = make_move(board, *selected, row, col, current_player, move_log)
+                            promote_to_king(board, new_r, new_c, current_player)
+                            move_sound.play()
+                            selected = None
+                            valid_moves = []
+                            alert_message = ""
+                            before_switch = (new_r, new_c)
+                            after_r, after_c = handle_multi_capture(board, new_r, new_c, current_player, move_log)
+                            if (after_r, after_c) == before_switch:
+                                current_player = 'R' if current_player == 'B' else 'B'
+                        else:
+                            alert_message = "⚠️ You must capture!"
+                            selected = None
+                            valid_moves = []
+                    else:
+                        if is_valid_move(board, *selected, row, col, current_player):
+                            undo_stack.append(copy.deepcopy(board))
+                            redo_stack.clear()
+                            new_r, new_c = make_move(board, *selected, row, col, current_player, move_log)
+                            promote_to_king(board, new_r, new_c, current_player)
+                            move_sound.play()
+                            selected = None
+                            valid_moves = []
+                            alert_message = ""
+                            before_switch = (new_r, new_c)
+                            after_r, after_c = handle_multi_capture(board, new_r, new_c, current_player, move_log)
+                            if (after_r, after_c) == before_switch:
+                                current_player = 'R' if current_player == 'B' else 'B'
+                        else:
+                            alert_message = "Invalid move."
+                            selected = None
+                            valid_moves = []
                 elif board[row][col].startswith(current_player):
                     selected = (row, col)
-                    valid_moves = get_available_captures(board, row, col, current_player)
+                    valid_moves = get_available_captures(board, row, col, current_player) if player_has_captures(board, current_player) else []
+                    alert_message = ""
 
         pygame.display.set_caption(f"Checkers - {current_player}'s Turn")
 
