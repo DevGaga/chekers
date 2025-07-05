@@ -31,6 +31,15 @@ def promote_to_king(board, row, col, player):
     elif player == 'R' and row == 0:
         board[row][col] = 'RK'
 
+def player_has_captures(board, player):
+    for r in range(8):
+        for c in range(8):
+            if board[r][c] in [player, player + 'K']:
+                captures = get_available_captures(board, r, c, player)
+                if captures:
+                    return True
+    return False
+
 def is_valid_move(board, sr, sc, er, ec, player, is_capture=False):
     if not all(0 <= n < 8 for n in [sr, sc, er, ec]):
         return False
@@ -48,6 +57,11 @@ def is_valid_move(board, sr, sc, er, ec, player, is_capture=False):
     abs_dc = abs(dc)
 
     if abs_dr == 1 and abs_dc == 1 and not is_capture:
+        # Check if player must capture instead
+        if player_has_captures(board, player):
+            print(f"⚠️  Invalid move! {player} must capture if possible.")
+            return False
+
         if is_king(piece):
             return True
         elif (player == 'B' and dr == 1) or (player == 'R' and dr == -1):
