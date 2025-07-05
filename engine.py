@@ -57,11 +57,6 @@ def is_valid_move(board, sr, sc, er, ec, player, is_capture=False):
     abs_dc = abs(dc)
 
     if abs_dr == 1 and abs_dc == 1 and not is_capture:
-        # Check if player must capture instead
-        if player_has_captures(board, player):
-            print(f"⚠️  Invalid move! {player} must capture if possible.")
-            return False
-
         if is_king(piece):
             return True
         elif (player == 'B' and dr == 1) or (player == 'R' and dr == -1):
@@ -191,11 +186,8 @@ def replay_game(move_log):
 def handle_multi_capture(board, sr, sc, player, move_log):
     captures = get_available_captures(board, sr, sc, player)
     while captures:
-        print_board(board)
-        print(f"{player}, you have another capture from ({sr}, {sc})!")
-        print("Available jumps:", captures)
         try:
-            er, ec = captures[0]  # auto-select first capture in GUI version
+            er, ec = captures[0]
             sr, sc = make_move(board, sr, sc, er, ec, player, move_log)
             captures = get_available_captures(board, sr, sc, player)
         except Exception:
