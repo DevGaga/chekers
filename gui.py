@@ -2,6 +2,7 @@
 
 import pygame
 import copy
+import time
 from engine import (
     create_board, is_valid_move, make_move,
     get_available_captures, count_pieces,
@@ -29,6 +30,7 @@ RED = (255, 0, 0)
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 BLUE = (70, 130, 180)
+ARROW_COLOR = (0, 255, 255)
 
 # Initialize pygame and load resources
 pygame.init()
@@ -61,7 +63,14 @@ button_width = SCREEN_WIDTH // 4
 undo_button = pygame.Rect(SCREEN_WIDTH // 8, SCREEN_HEIGHT - BUTTON_AREA + BUTTON_MARGIN, button_width, BUTTON_HEIGHT)
 redo_button = pygame.Rect(SCREEN_WIDTH * 5 // 8, SCREEN_HEIGHT - BUTTON_AREA + BUTTON_MARGIN, button_width, BUTTON_HEIGHT)
 
-def draw_board(win, board, valid_moves):
+def draw_arrow(win, start, end):
+    pygame.draw.line(win, ARROW_COLOR, start, end, 4)
+    direction = pygame.math.Vector2(end[0]-start[0], end[1]-start[1])
+    direction.scale_to_length(10)
+    tip = (end[0] - direction.x, end[1] - direction.y)
+    pygame.draw.circle(win, ARROW_COLOR, (int(tip[0]), int(tip[1])), 5)
+
+def draw_board(win, board, valid_moves, arrows=[], blink=False):
     win.fill(WHITE)
     win.blit(logo, (10, TOP_MARGIN))
 
@@ -71,7 +80,7 @@ def draw_board(win, board, valid_moves):
             y = TOP_MARGIN + row * SQUARE_SIZE
             color = DARK_BROWN if (row + col) % 2 else LIGHT_BROWN
             pygame.draw.rect(win, color, (x, y, SQUARE_SIZE, SQUARE_SIZE))
-            if (row, col) in valid_moves:
+            if (row, col) in valid_moves and (not blink or int(time.time() * 2) % 2 == 0):
                 pygame.draw.rect(win, GREEN, (x, y, SQUARE_SIZE, SQUARE_SIZE))
 
     for row in range(ROWS):
@@ -87,6 +96,10 @@ def draw_board(win, board, valid_moves):
                     win.blit(king_image_black, (center[0] - king_image_black.get_width() // 2, center[1] - king_image_black.get_height() // 2))
                 elif piece == 'RK':
                     win.blit(king_image_red, (center[0] - king_image_red.get_width() // 2, center[1] - king_image_red.get_height() // 2))
+
+    if blink and int(time.time() * 2) % 2 == 0:
+        for arrow in arrows:
+            draw_arrow(win, arrow[0], arrow[1])
 
     draw_buttons(win)
     pygame.display.update()
@@ -132,10 +145,13 @@ def main():
     undo_stack = []
     redo_stack = []
     alert_message = ""
+    multi_capture_pos = []
+    arrows = []
+    blink_arrows = False
 
     while run:
         clock.tick(60)
-        draw_board(WIN, board, get_all_capture_positions(board, current_player) if alert_message else valid_moves)
+        draw_board(WIN, board, multi_capture_pos if multi_capture_pos else (get_all_capture_positions(board, current_player) if alert_message else valid_moves), arrows, blink=blink_arrows)
         draw_alert(WIN, alert_message)
         pygame.display.update()
 
@@ -152,14 +168,20 @@ def main():
                     current_player = 'R' if current_player == 'B' else 'B'
                     selected = None
                     valid_moves = []
+                    multi_capture_pos = []
                     alert_message = ""
+                    arrows = []
+                    blink_arrows = False
                     continue
                 elif redo_button.collidepoint(mouse_pos) and redo_stack:
                     undo_stack.append(copy.deepcopy(board))
                     board, current_player = redo_stack.pop()
                     selected = None
                     valid_moves = []
+                    multi_capture_pos = []
                     alert_message = ""
+                    arrows = []
+                    blink_arrows = False
                     continue
 
                 row, col = get_row_col_from_mouse(mouse_pos)
@@ -174,17 +196,21 @@ def main():
                             new_r, new_c = make_move(board, *selected, row, col, current_player, move_log)
                             promote_to_king(board, new_r, new_c, current_player)
                             move_sound.play()
+                            arrows.append(((LEFT_MARGIN + selected[1] * SQUARE_SIZE + SQUARE_SIZE // 2, TOP_MARGIN + selected[0] * SQUARE_SIZE + SQUARE_SIZE // 2), (LEFT_MARGIN + col * SQUARE_SIZE + SQUARE_SIZE // 2, TOP_MARGIN + row * SQUARE_SIZE + SQUARE_SIZE // 2)))
+                            blink_arrows = True
                             selected = None
                             valid_moves = []
                             alert_message = ""
-                            before_switch = (new_r, new_c)
-                            after_r, after_c = handle_multi_capture(board, new_r, new_c, current_player, move_log)
-                            if (after_r, after_c) == before_switch:
+                            multi_capture_pos = get_available_captures(board, new_r, new_c, current_player)
+                            if not multi_capture_pos:
                                 current_player = 'R' if current_player == 'B' else 'B'
+                                arrows = []
+                                blink_arrows = False
                         else:
                             alert_message = "⚠️ You must capture!"
                             selected = None
                             valid_moves = []
+                            multi_capture_pos = []
                     else:
                         if is_valid_move(board, *selected, row, col, current_player):
                             undo_stack.append(copy.deepcopy(board))
@@ -195,18 +221,21 @@ def main():
                             selected = None
                             valid_moves = []
                             alert_message = ""
-                            before_switch = (new_r, new_c)
-                            after_r, after_c = handle_multi_capture(board, new_r, new_c, current_player, move_log)
-                            if (after_r, after_c) == before_switch:
+                            multi_capture_pos = get_available_captures(board, new_r, new_c, current_player)
+                            if not multi_capture_pos:
                                 current_player = 'R' if current_player == 'B' else 'B'
+                                arrows = []
+                                blink_arrows = False
                         else:
                             alert_message = "Invalid move."
                             selected = None
                             valid_moves = []
+                            multi_capture_pos = []
                 elif board[row][col].startswith(current_player):
                     selected = (row, col)
                     valid_moves = get_available_captures(board, row, col, current_player) if player_has_captures(board, current_player) else []
                     alert_message = ""
+                    multi_capture_pos = []
 
         pygame.display.set_caption(f"Checkers - {current_player}'s Turn")
 
