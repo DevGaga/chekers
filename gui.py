@@ -135,6 +135,7 @@ def main():
     alert_message = ""
     arrows = []
     blink_arrows = False
+    chain_capture = False
 
     while run:
         clock.tick(60)
@@ -182,19 +183,32 @@ def main():
                         move_sound.play()
                         arrows.append(((LEFT_MARGIN + selected[1] * SQUARE_SIZE + SQUARE_SIZE // 2, TOP_MARGIN + selected[0] * SQUARE_SIZE + SQUARE_SIZE // 2), (LEFT_MARGIN + col * SQUARE_SIZE + SQUARE_SIZE // 2, TOP_MARGIN + row * SQUARE_SIZE + SQUARE_SIZE // 2)))
                         blink_arrows = True
-                        selected = None
-                        valid_moves = []
-                        alert_message = ""
-                        current_player = 'R' if current_player == 'B' else 'B'
-                        arrows = []
-                        blink_arrows = False
+
+                        next_captures = get_available_captures(board, new_r, new_c, current_player)
+                        if next_captures:
+                            selected = (new_r, new_c)
+                            valid_moves = next_captures
+                            alert_message = "Continue capturing!"
+                            chain_capture = True
+                        else:
+                            selected = None
+                            valid_moves = []
+                            alert_message = ""
+                            current_player = 'R' if current_player == 'B' else 'B'
+                            arrows = []
+                            blink_arrows = False
+                            chain_capture = False
                     else:
                         alert_message = "Invalid move."
                         selected = None
                         valid_moves = []
+                        chain_capture = False
                 elif board[row][col].startswith(current_player):
                     selected = (row, col)
-                    valid_moves = get_available_captures(board, row, col, current_player) or []
+                    valid_moves = get_available_captures(board, row, col, current_player)
+                    if not valid_moves:
+                        valid_moves = []
+                        chain_capture = False
                     alert_message = ""
 
         pygame.display.set_caption(f"Checkers - {current_player}'s Turn")
