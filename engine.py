@@ -1,5 +1,3 @@
-# engine.py
-
 def create_board():
     board = []
     for row in range(8):
@@ -76,14 +74,12 @@ def is_valid_move(board, sr, sc, er, ec, player, is_capture=False):
         step_r = 1 if dr > 0 else -1
         step_c = 1 if dc > 0 else -1
         r, c = sr + step_r, sc + step_c
-        enemy_pos = None
         while r != er and c != ec:
             if board[r][c] != ' ':
                 if board[r][c][0] != player:
                     enemies += 1
                     if enemies > 1:
                         return False
-                    enemy_pos = (r, c)
                 else:
                     return False
             r += step_r
@@ -114,8 +110,10 @@ def make_move(board, sr, sc, er, ec, player, move_log):
 
 def get_available_captures(board, r, c, player):
     piece = board[r][c]
-    captures = []
+    if not piece.startswith(player):
+        return []
 
+    captures = []
     if is_king(piece):
         for dr_sign in [-1, 1]:
             for dc_sign in [-1, 1]:

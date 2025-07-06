@@ -1,5 +1,3 @@
-# gui.py
-
 import pygame
 import copy
 import time
@@ -97,9 +95,8 @@ def draw_board(win, board, valid_moves, arrows=[], blink=False):
                 elif piece == 'RK':
                     win.blit(king_image_red, (center[0] - king_image_red.get_width() // 2, center[1] - king_image_red.get_height() // 2))
 
-    if blink and int(time.time() * 2) % 2 == 0:
-        for arrow in arrows:
-            draw_arrow(win, arrow[0], arrow[1])
+    for arrow in arrows:
+        draw_arrow(win, arrow[0], arrow[1])
 
     draw_buttons(win)
     pygame.display.update()
@@ -218,6 +215,8 @@ def main():
                             new_r, new_c = make_move(board, *selected, row, col, current_player, move_log)
                             promote_to_king(board, new_r, new_c, current_player)
                             move_sound.play()
+                            arrows.append(((LEFT_MARGIN + selected[1] * SQUARE_SIZE + SQUARE_SIZE // 2, TOP_MARGIN + selected[0] * SQUARE_SIZE + SQUARE_SIZE // 2), (LEFT_MARGIN + col * SQUARE_SIZE + SQUARE_SIZE // 2, TOP_MARGIN + row * SQUARE_SIZE + SQUARE_SIZE // 2)))
+                            blink_arrows = True
                             selected = None
                             valid_moves = []
                             alert_message = ""
